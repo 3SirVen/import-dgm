@@ -1,0 +1,18 @@
+schema_version = "1.0.0"
+
+id = "import_dgm"
+version = "1.0.0"
+name = "Import DGM"
+description = "Import digital ground models (DGM)"
+tagline = "Import DGMs"
+maintainer = "3SirVen"
+type = "add-on"
+permissions = ["files"]
+
+website = "https://github.com/3SirVen/import-dgm"
+
+tags = ["Import-Export"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:AGPL-3.0-or-later"]
