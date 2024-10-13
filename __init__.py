@@ -1,6 +1,5 @@
 import os
 import re
-import time
 from operator import itemgetter
 
 import bpy
@@ -77,9 +76,6 @@ def get_coordinates_from_file(
 
     xSize, ySize = calculate_size(vertices)
 
-    print(f"xSize: {xSize}")
-    print(f"ySize: {ySize}")
-
     return vertices, xSize, ySize
 
 
@@ -120,7 +116,30 @@ def create_polygon_mesh(vertices, xSize, ySize, ob_name):
     return mesh
 
 
-def find_closest_edges(vertices, edges):
+def find_all_vertices_on_edges(vertices, search_x_fixed, fixed_coordinate, min, max):
+    if search_x_fixed:
+        return [
+            vertex
+            for vertex in vertices
+            if vertex[0] == fixed_coordinate and vertex[1] >= min and vertex[1] <= max
+        ]
+    else:
+        return [
+            vertex
+            for vertex in vertices
+            if vertex[1] == fixed_coordinate and vertex[0] >= min and vertex[0] <= max
+        ]
+
+
+def find_entry_by_x_and_y(vertices, x, y):
+    for vertex in vertices:
+        if vertex[0] == x and vertex[1] == y:
+            return vertex
+
+    return None
+
+
+def find_closest_edges(vertices, edges, x_size, y_size):
     if not vertices or not edges:
         raise ValueError("Vertices and edges must not be empty")
 
@@ -129,20 +148,39 @@ def find_closest_edges(vertices, edges):
     ):
         raise ValueError("Vertices and edges must be lists of tuples or lists")
 
-    # Initialize closestX and closestY with negative infinity
-    closestX = float("-inf")
-    closestY = float("-inf")
+    # Initialize closest_x and closest_y with negative infinity
+    closest_x = float("-inf")
+    closest_y = float("-inf")
+
+    closest_x_tuple = (float("-inf"), float("-inf"))
+    closest_y_tuple = (float("-inf"), float("-inf"))
 
     for edge in edges:
-        if edge[0] < vertices[0][0] and edge[0] > closestX:
-            closestX = edge[0]
-        if edge[1] < vertices[0][1] and edge[1] > closestY:
-            closestY = edge[1]
+        if edge[0] <= vertices[0][0] and edge[0] >= closest_x:
+            if edge[1] >= closest_x_tuple[1] and edge[1] <= vertices[x_size - 1][1]:
+                closest_x = edge[0]
+                closest_x_tuple = edge
 
-    print(f"Closest X: {closestX}")
-    print(f"Closest Y: {closestY}")
+        if edge[1] < vertices[0][1] and edge[1] >= closest_y:
+            if edge[0] >= closest_y_tuple[0] and edge[0] <= vertices[-1][0]:
+                closest_y = edge[1]
+                closest_y_tuple = edge
 
-    return None, None, None, None
+    all_vertices_on_closest_x = []
+    if closest_x != float("-inf"):
+        all_vertices_on_closest_x = find_all_vertices_on_edges(
+            edges, True, closest_x, vertices[0][1], closest_x_tuple[1]
+        )
+
+    all_vertices_on_closest_y = []
+    if closest_y != float("-inf"):
+        all_vertices_on_closest_y = find_all_vertices_on_edges(
+            edges, False, closest_y, vertices[0][0], closest_y_tuple[0]
+        )
+
+    combined_closest = find_entry_by_x_and_y(edges, closest_x, closest_y)
+
+    return all_vertices_on_closest_x, all_vertices_on_closest_y, combined_closest
 
 
 def main(
@@ -154,18 +192,14 @@ def main(
     ignore_rows,
     ignore_columns,
 ):
-    print(f"Scale: {scale}")
-    print(f"Origin: {origin}")
-    print(f"Coordinate System: {coordinate_system}")
-    print(f"Ignore Rows: {ignore_rows}")
-    print(f"Ignore Columns: {ignore_columns}")
-
     # Sort all files by name
     files = sorted(list(files), key=lambda x: x.name)
 
     meshes = []
 
     edges = []
+
+    all_vertices = []
 
     for i, file in enumerate(files):
         try:
@@ -185,15 +219,13 @@ def main(
                 )
 
                 try:
-                    closestX, closestY, closestX2, closestY2 = find_closest_edges(
-                        vertices, edges
+                    vertices_on_x, vertices_on_y, combined_closest = find_closest_edges(
+                        vertices, edges, file_xSize, file_ySize
                     )
                 except Exception as e:
                     print(f"Error finding closest edges: {e}")
-                    closestX = None
-                    closestY = None
-                    closestX2 = None
-                    closestY2 = None
+                    vertices_on_x, vertices_on_y = [], []
+                    combined_closest = None
 
                 # Add all vertices along the edges to the list
                 for i in range(file_xSize):
@@ -203,38 +235,23 @@ def main(
                     edges.append(vertices[i * file_xSize])
                     edges.append(vertices[i * file_xSize + file_xSize - 1])
 
-                if closestX is not None:
-                    print(f"Closest X: {closestX}")
-                    # Add test object for closest X
-                    bpy.ops.mesh.primitive_cube_add(size=100, location=closestX)
-                    # set the object name
-                    bpy.context.object.name = file.name + "closestX"
+                if vertices_on_x:
+                    vertices.extend(vertices_on_x)
+                    file_xSize += 1
+                if vertices_on_y:
+                    vertices.extend(vertices_on_y)
+                    file_ySize += 1
+                if combined_closest:
+                    vertices.append(combined_closest)
 
-                if closestY is not None:
-                    print(f"Closest Y: {closestY}")
-                    # Add test object for closest Y
-                    bpy.ops.mesh.primitive_cube_add(size=100, location=closestY)
-                    # set the object name
-                    bpy.context.object.name = file.name + "closestY"
+                vertices = sorted(vertices, key=itemgetter(0, 1))
 
-                if closestX2 is not None:
-                    print(f"Closest X2: {closestX2}")
-                    # Add test object for closest X2
-                    bpy.ops.mesh.primitive_cube_add(size=100, location=closestX2)
-                    # set the object name
-                    bpy.context.object.name = file.name + "closestX2"
+                all_vertices.extend(vertices)
 
-                if closestY2 is not None:
-                    print(f"Closest Y2: {closestY2}")
-                    # Add test object for closest Y2
-                    bpy.ops.mesh.primitive_cube_add(size=100, location=closestY2)
-                    # set the object name
-                    bpy.context.object.name = file.name + "closestY2"
-
-                ob_name = os.path.basename(path_to_file)
-                meshes.append(
-                    create_polygon_mesh(vertices, file_xSize, file_ySize, ob_name)
-                )
+                # ob_name = os.path.basename(path_to_file)
+                # meshes.append(
+                #     create_polygon_mesh(vertices, file_xSize, file_ySize, ob_name)
+                # )
 
             elif path_to_file.endswith(".tif"):
                 raise NotImplementedError("TIFF files are not supported yet")
@@ -243,6 +260,25 @@ def main(
         except Exception as e:
             print(f"Error importing {file.name}: {e}")
             continue
+
+    all_vertices = sorted(all_vertices, key=itemgetter(0, 1))
+    # Remove duplicates
+    all_vertices = [
+        all_vertices[i]
+        for i in range(len(all_vertices))
+        if i == 0 or all_vertices[i] != all_vertices[i - 1]
+    ]
+
+    try:
+        create_polygon_mesh(
+            all_vertices,
+            calculate_size(all_vertices)[0],
+            calculate_size(all_vertices)[1],
+            "All",
+        )
+    except Exception as e:
+        print(f"Error creating mesh for all vertices: {e}")
+        return
 
 
 class DGMDirectorySelector(bpy.types.Operator, ImportHelper):
@@ -268,13 +304,13 @@ class DGMDirectorySelector(bpy.types.Operator, ImportHelper):
         name="Origin Point X",
         description="Set the X coordinate of the origin point you want to use for the data",
         precision=1,
-        default=0.0,
+        default=530000.0,
     )  # type: ignore
     origin_setting_y: FloatProperty(
         name="Origin Point Y",
         description="Set the Y coordinate of the origin point you want to use for the data",
         precision=1,
-        default=0.0,
+        default=6036000.0,
     )  # type: ignore
     origin_setting_z: FloatProperty(
         name="Origin Point Z",
