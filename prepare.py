@@ -9,6 +9,8 @@ FILES_AND_FOLDERS = [
     "./README.md",
     "./LICENSE",
     "./blender_manifest.toml",
+    "./sort_xyz_files.py",
+    "./convert_TIF_to_XYZ.py",
 ]
 ROOT_DIR = "Import DGM"
 
