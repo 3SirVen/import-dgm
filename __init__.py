@@ -13,7 +13,7 @@ from bpy.props import (
 )
 from bpy_extras.io_utils import ImportHelper
 
-from . import sort_xyz_files
+from . import convert_TIF_to_XYZ, sort_xyz_files
 
 
 def calculate_size(vertices):
@@ -183,6 +183,50 @@ def find_closest_edges(vertices, edges, x_size, y_size):
     return all_vertices_on_closest_x, all_vertices_on_closest_y, combined_closest
 
 
+def process_file(
+    path_to_file, edges, all_vertices, ignore_rows, ignore_columns, scale, origin
+):
+    delimiter = " "
+    vertices, file_xSize, file_ySize = get_coordinates_from_file(
+        path_to_file,
+        delimiter,
+        ignore_rows,
+        ignore_columns,
+        scale,
+        origin,
+    )
+
+    try:
+        vertices_on_x, vertices_on_y, combined_closest = find_closest_edges(
+            vertices, edges, file_xSize, file_ySize
+        )
+    except Exception as e:
+        print(f"Error finding closest edges: {e}")
+        vertices_on_x, vertices_on_y = [], []
+        combined_closest = None
+
+    # Add all vertices along the edges to the list
+    for i in range(file_xSize):
+        edges.append(vertices[i])
+        edges.append(vertices[file_xSize * (file_ySize - 1) + i])
+    for i in range(file_ySize):
+        edges.append(vertices[i * file_xSize])
+        edges.append(vertices[i * file_xSize + file_xSize - 1])
+
+    if vertices_on_x:
+        vertices.extend(vertices_on_x)
+        file_xSize += 1
+    if vertices_on_y:
+        vertices.extend(vertices_on_y)
+        file_ySize += 1
+    if combined_closest:
+        vertices.append(combined_closest)
+
+    vertices = sorted(vertices, key=itemgetter(0, 1))
+
+    all_vertices.extend(vertices)
+
+
 def main(
     files,
     folder,
@@ -195,8 +239,6 @@ def main(
     # Sort all files by name
     files = sorted(list(files), key=lambda x: x.name)
 
-    meshes = []
-
     edges = []
 
     all_vertices = []
@@ -208,53 +250,30 @@ def main(
 
             # Distinguish between different file types
             if path_to_file.endswith(".xyz") or path_to_file.endswith(".txt"):
-                delimiter = " "
-                vertices, file_xSize, file_ySize = get_coordinates_from_file(
+                process_file(
                     path_to_file,
-                    delimiter,
+                    edges,
+                    all_vertices,
                     ignore_rows,
                     ignore_columns,
                     scale,
                     origin,
                 )
 
-                try:
-                    vertices_on_x, vertices_on_y, combined_closest = find_closest_edges(
-                        vertices, edges, file_xSize, file_ySize
-                    )
-                except Exception as e:
-                    print(f"Error finding closest edges: {e}")
-                    vertices_on_x, vertices_on_y = [], []
-                    combined_closest = None
-
-                # Add all vertices along the edges to the list
-                for i in range(file_xSize):
-                    edges.append(vertices[i])
-                    edges.append(vertices[file_xSize * (file_ySize - 1) + i])
-                for i in range(file_ySize):
-                    edges.append(vertices[i * file_xSize])
-                    edges.append(vertices[i * file_xSize + file_xSize - 1])
-
-                if vertices_on_x:
-                    vertices.extend(vertices_on_x)
-                    file_xSize += 1
-                if vertices_on_y:
-                    vertices.extend(vertices_on_y)
-                    file_ySize += 1
-                if combined_closest:
-                    vertices.append(combined_closest)
-
-                vertices = sorted(vertices, key=itemgetter(0, 1))
-
-                all_vertices.extend(vertices)
-
-                # ob_name = os.path.basename(path_to_file)
-                # meshes.append(
-                #     create_polygon_mesh(vertices, file_xSize, file_ySize, ob_name)
-                # )
-
             elif path_to_file.endswith(".tif"):
-                raise NotImplementedError("TIFF files are not supported yet")
+                convert_TIF_to_XYZ.process_path(path_to_file)
+
+                xyz_path = path_to_file.replace(".tif", ".xyz")
+
+                process_file(
+                    xyz_path,
+                    edges,
+                    all_vertices,
+                    ignore_rows,
+                    ignore_columns,
+                    scale,
+                    origin,
+                )
             else:
                 raise ValueError("Invalid file type")
         except Exception as e:

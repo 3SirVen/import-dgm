@@ -1,10 +1,26 @@
 import os
 import sys
-from multiprocessing import Pool, cpu_count
 
-import rasterio
-from pyproj import CRS, Transformer
-from tqdm import tqdm
+# Try importing rasterio. If it fails, install it with the blender python
+# interpreter.
+try:
+    import rasterio
+except ImportError:
+    import subprocess
+
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "rasterio"], stdout=subprocess.DEVNULL
+    )
+    import rasterio
+try:
+    from pyproj import CRS, Transformer
+except ImportError:
+    import subprocess
+
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "pyproj"], stdout=subprocess.DEVNULL
+    )
+    from pyproj import CRS, Transformer
 
 
 def convert_tif_to_xyz(tif_path, xyz_path):
@@ -21,10 +37,8 @@ def convert_tif_to_xyz(tif_path, xyz_path):
 
         coordinates = []
 
-        # Iterate over the rows and columns of the height data with a progress bar
-        for row in tqdm(
-            range(height_data.shape[0]), desc=f"Processing {os.path.basename(tif_path)}"
-        ):
+        # Iterate over the rows and columns of the height data
+        for row in range(height_data.shape[0]):
             for col in range(height_data.shape[1]):
                 # Get the x, y coordinates in the source CRS
                 x, y = transform_affine * (col, row)
@@ -43,10 +57,6 @@ def convert_tif_to_xyz(tif_path, xyz_path):
             for coord in coordinates:
                 xyz_file.write(f"{coord[0]} {coord[1]} {coord[2]}\n")
 
-            # Remove the last newline character
-            xyz_file.seek(xyz_file.tell() - 1)
-            xyz_file.truncate()
-
 
 def process_file(tif_path):
     xyz_path = tif_path.replace(".tif", ".xyz")
@@ -63,13 +73,8 @@ def process_path(path):
         tif_files = [
             os.path.join(path, f) for f in os.listdir(path) if f.endswith(".tif")
         ]
-        with Pool(round(cpu_count() / 2)) as pool:
-            for _ in tqdm(
-                pool.imap_unordered(process_file, tif_files),
-                total=len(tif_files),
-                desc="Processing directory",
-            ):
-                pass
+        for tif_file in tif_files:
+            process_file(tif_file)
     else:
         print(f"Path {path} is neither a file nor a directory.")
 
