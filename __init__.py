@@ -111,6 +111,13 @@ def create_polygon_mesh(vertices, xSize, ySize, ob_name):
 
     obj.data.materials.append(mat)
 
+    # Create UV map
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.cube_project(cube_size=1, scale_to_bounds=True, correct_aspect=True)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
     mesh.update(calc_edges=True)
 
     return mesh
@@ -303,15 +310,15 @@ def main(
 class DGMDirectorySelector(bpy.types.Operator, ImportHelper):
     """Operator to select and import DGM files."""
 
-    bl_idname = "wm.dgm_folder_selector"
-    bl_label = "Import cityGML file(s)"
+    bl_idname = "import_create.dgm"
+    bl_label = "Import Digital Ground Models file(s)"
 
     filename_ext = ".xyz, .txt, .tif"
     use_filter_folder = True
     filter_glob: StringProperty(default="*.xyz;*.txt;*.tif", options={"HIDDEN"})  # type: ignore
 
     files: CollectionProperty(name="File Path", type=bpy.types.OperatorFileListElement)  # type: ignore
-    scale_setting: FloatProperty(
+    scale: FloatProperty(
         name="Set Scale",
         description="Set the scale at which the data should be imported",
         soft_min=0.0,
@@ -376,7 +383,7 @@ class DGMDirectorySelector(bpy.types.Operator, ImportHelper):
         box = layout.box()
         row = box.row(align=True)
         row.label(text="Import Scale:")
-        row.prop(self, "scale_setting", text="")
+        row.prop(self, "scale", text="")
 
         box = layout.box()
         row = box.row(align=True)
@@ -410,7 +417,7 @@ class DGMDirectorySelector(bpy.types.Operator, ImportHelper):
             main(
                 files=self.files,
                 folder=folder,
-                scale=self.scale_setting,
+                scale=self.scale,
                 origin=(
                     self.origin_setting_x,
                     self.origin_setting_y,
