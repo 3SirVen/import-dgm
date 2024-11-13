@@ -118,6 +118,12 @@ def create_polygon_mesh(vertices, xSize, ySize, ob_name):
     bpy.ops.uv.cube_project(cube_size=1, scale_to_bounds=True, correct_aspect=True)
     bpy.ops.object.mode_set(mode="OBJECT")
 
+    # Flip Normals
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
     mesh.update(calc_edges=True)
 
     return mesh
@@ -404,6 +410,8 @@ class DGMDirectorySelector(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         folder = os.path.dirname(self.filepath)
 
+        print(f"Sorting XYZ files in folder {folder}")
+
         try:
             sort_xyz_files.sort_all_xyz_files_in_folder(
                 folder_path=folder, check_for_km2=True, multiprocessing=False
@@ -412,6 +420,8 @@ class DGMDirectorySelector(bpy.types.Operator, ImportHelper):
             self.report({"ERROR"}, f"Error sorting XYZ files: {e}")
             print(f"Error sorting XYZ files: {e}")
             return {"CANCELLED"}
+
+        print(f"Importing DGM files from folder {folder}")
 
         try:
             main(
