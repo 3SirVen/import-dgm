@@ -15,6 +15,17 @@ from bpy_extras.io_utils import ImportHelper
 
 from . import convert_TIF_to_XYZ, sort_xyz_files
 
+bl_info = {
+    "name": "Import DGM",
+    "description": "Import digital ground models (DGM)",
+    "author": "3SirVen",
+    "version": (1, 0, 1),
+    "blender": (4, 2, 0),
+    "doc_url": "https://github.com/3SirVen/import-dgm",
+    "support": "COMMUNITY",
+    "category": "Import-Export",
+}
+
 
 def calculate_size(vertices):
     xSize = (
