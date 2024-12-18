@@ -39,9 +39,16 @@ def calculate_size(vertices):
     return xSize, ySize
 
 
-def get_coordinates_from_file(
-    filename, delimiter, ignore_rows, ignore_columns, scale, origin
-):
+def get_coordinates_from_file(filename, ignore_rows, ignore_columns, scale, origin):
+    # Find delimiter by searching for the first character that is not a valid character in a float
+    with open(filename, "r") as file:
+        delimiter = next(
+            (char for char in file.readline() if char not in "0123456789.-"), None
+        )
+
+    if not delimiter:
+        raise ValueError("Could not determine delimiter")
+
     xSize = 0
     lines = []
     currentY = 0
@@ -210,10 +217,8 @@ def find_closest_edges(vertices, edges, x_size, y_size):
 def process_file(
     path_to_file, edges, all_vertices, ignore_rows, ignore_columns, scale, origin
 ):
-    delimiter = " "
     vertices, file_xSize, file_ySize = get_coordinates_from_file(
         path_to_file,
-        delimiter,
         ignore_rows,
         ignore_columns,
         scale,
@@ -301,7 +306,7 @@ def main(
             else:
                 raise ValueError("Invalid file type")
         except Exception as e:
-            print(f"Error importing {file.name}: {e}")
+            print(f"Error importing {file.name}: {e} at {e.__traceback__.tb_lineno}")
             continue
 
     all_vertices = sorted(all_vertices, key=itemgetter(0, 1))
