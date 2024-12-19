@@ -15,6 +15,17 @@ from bpy_extras.io_utils import ImportHelper
 
 from . import convert_TIF_to_XYZ, sort_xyz_files
 
+try:
+    from pyproj import CRS, Transformer
+except ImportError:
+    import subprocess
+    import sys
+
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "rasterio"], stdout=subprocess.DEVNULL
+    )
+    from pyproj import CRS, Transformer
+
 bl_info = {
     "name": "Import DGM",
     "description": "Import digital ground models (DGM)",
@@ -39,7 +50,18 @@ def calculate_size(vertices):
     return xSize, ySize
 
 
+def convert_utm_32_to_33(coordinate):
+    utm_32 = CRS("epsg:25832")
+    utm_33 = CRS("epsg:25833")
+    transformer = Transformer.from_crs(utm_32, utm_33, always_xy=True)
+    new_coordinate = transformer.transform(coordinate[0], coordinate[1])
+    return (new_coordinate[0], new_coordinate[1], coordinate[2])
+
+
 def get_coordinates_from_file(filename, ignore_rows, ignore_columns, scale, origin):
+    if filename.split("_")[1] == "33":
+        origin = convert_utm_32_to_33(origin)
+
     # Find delimiter by searching for the first character that is not a valid character in a float
     with open(filename, "r") as file:
         delimiter = next(
